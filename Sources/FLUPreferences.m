@@ -2,11 +2,35 @@
 
 static NSString * const kPath = @"/var/jb/var/mobile/Library/Preferences/com.storagefake.lastused.plist";
 
+static NSDate *FLUDateFromValue(id raw) {
+    if ([raw isKindOfClass:[NSDate class]]) return raw;
+    if (![raw isKindOfClass:[NSString class]]) return nil;
+    NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
+    NSDate *date = [iso dateFromString:raw];
+    if (!date) {
+        NSDateFormatter *f = [[NSDateFormatter alloc] init];
+        f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+        f.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+        date = [f dateFromString:raw];
+    }
+    return date;
+}
+
+static FLUMode FLUModeFromValue(id raw, FLUMode fallback) {
+    NSString *mode = [[raw description] lowercaseString];
+    if ([mode isEqualToString:@"never"] || [mode isEqualToString:@"neverused"]) return FLUModeNeverUsed;
+    if ([mode isEqualToString:@"fixed"] || [mode isEqualToString:@"custom"]) return FLUModeFixedDate;
+    if ([mode isEqualToString:@"off"] || [mode isEqualToString:@"disabled"]) return FLUModeDisabled;
+    if ([mode isEqualToString:@"justnow"] || [mode isEqualToString:@"now"]) return FLUModeJustNow;
+    return fallback;
+}
+
 @implementation FLUPreferences {
     BOOL _enabled;
     FLUMode _mode;
     NSDate *_fixedDate;
     BOOL _debugLogging;
+    NSDictionary<NSString *, NSDictionary *> *_appDates;
 }
 
 + (instancetype)shared {
@@ -23,57 +47,48 @@ static NSString * const kPath = @"/var/jb/var/mobile/Library/Preferences/com.sto
 }
 
 - (void)reload {
-    NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:kPath];
+    NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:kPath] ?: @{};
     _enabled = d[@"Enabled"] ? [d[@"Enabled"] boolValue] : YES;
     _debugLogging = d[@"DebugLogging"] ? [d[@"DebugLogging"] boolValue] : NO;
+    _mode = FLUModeFromValue(d[@"Mode"] ?: @"justnow", FLUModeJustNow);
+    if (_mode == FLUModeDisabled) _enabled = NO;
 
-    NSString *mode = [d[@"Mode"] description] ?: @"justnow";
-    mode = mode.lowercaseString;
-    if ([mode isEqualToString:@"never"] || [mode isEqualToString:@"neverused"]) {
-        _mode = FLUModeNeverUsed;
-    } else if ([mode isEqualToString:@"fixed"] || [mode isEqualToString:@"custom"]) {
-        _mode = FLUModeFixedDate;
-    } else if ([mode isEqualToString:@"off"] || [mode isEqualToString:@"disabled"]) {
-        _mode = FLUModeDisabled;
-        _enabled = NO;
-    } else {
-        _mode = FLUModeJustNow;
-    }
+    _fixedDate = FLUDateFromValue(d[@"FixedDate"]);
+    if (!_fixedDate) _fixedDate = [NSDate dateWithTimeIntervalSince1970:1577836800];
 
-    _fixedDate = nil;
-    id raw = d[@"FixedDate"];
-    if ([raw isKindOfClass:[NSDate class]]) {
-        _fixedDate = raw;
-    } else if ([raw isKindOfClass:[NSString class]]) {
-        NSISO8601DateFormatter *iso = [[NSISO8601DateFormatter alloc] init];
-        _fixedDate = [iso dateFromString:raw];
-        if (!_fixedDate) {
-            NSDateFormatter *f = [[NSDateFormatter alloc] init];
-            f.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-            f.dateFormat = @"yyyy-MM-dd HH:mm:ss";
-            _fixedDate = [f dateFromString:raw];
-        }
-    }
-    if (!_fixedDate) {
-        // default fixed: 2020-01-01
-        _fixedDate = [NSDate dateWithTimeIntervalSince1970:1577836800];
-    }
+    id appDates = d[@"AppDates"];
+    _appDates = [appDates isKindOfClass:[NSDictionary class]] ? [appDates copy] : @{};
 }
 
 - (BOOL)enabled { return _enabled && _mode != FLUModeDisabled; }
 - (FLUMode)mode { return _mode; }
 - (NSDate *)fixedDate { return _fixedDate; }
 - (BOOL)debugLogging { return _debugLogging; }
+- (NSDictionary<NSString *,NSDictionary *> *)appDates { return _appDates; }
+
+- (BOOL)hasOverrideForBundleIdentifier:(NSString *)bundleIdentifier {
+    if (bundleIdentifier.length == 0) return NO;
+    return [_appDates[bundleIdentifier] isKindOfClass:[NSDictionary class]];
+}
+
+- (FLUMode)modeForBundleIdentifier:(NSString *)bundleIdentifier {
+    NSDictionary *entry = bundleIdentifier.length ? _appDates[bundleIdentifier] : nil;
+    if (![entry isKindOfClass:[NSDictionary class]]) return _mode;
+    return FLUModeFromValue(entry[@"Mode"], _mode);
+}
+
+- (NSDate *)fixedDateForBundleIdentifier:(NSString *)bundleIdentifier {
+    NSDictionary *entry = bundleIdentifier.length ? _appDates[bundleIdentifier] : nil;
+    NSDate *date = [entry isKindOfClass:[NSDictionary class]] ? FLUDateFromValue(entry[@"Date"]) : nil;
+    return date ?: _fixedDate;
+}
 
 - (NSString *)justNowString {
-    // Prefer system-localized if available; fallback RU/EN
-    return NSLocalizedStringFromTableInBundle(
-        @"Just Now", @"Localizable", [NSBundle mainBundle], @"Just Now") ?: @"Только что";
+    return NSLocalizedStringFromTableInBundle(@"Just Now", @"Localizable", [NSBundle mainBundle], @"Just Now") ?: @"Только что";
 }
 
 - (NSString *)neverUsedString {
-    return NSLocalizedStringFromTableInBundle(
-        @"Never Used", @"Localizable", [NSBundle mainBundle], @"Never Used") ?: @"Не использовалось";
+    return NSLocalizedStringFromTableInBundle(@"Never Used", @"Localizable", [NSBundle mainBundle], @"Never Used") ?: @"Не использовалось";
 }
 
 @end
