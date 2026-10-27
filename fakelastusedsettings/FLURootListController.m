@@ -110,7 +110,7 @@ static NSDate *FLUDateFromSetting(id raw) {
     [self.view addSubview:self.datePicker];
 
     self.keepTimeButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.keepTimeButton setTitle:@"Не менять время: выкл." forState:UIControlStateNormal];
+    [self.keepTimeButton setTitle:@"Не менять дату и время: выкл." forState:UIControlStateNormal];
     self.keepTimeButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.keepTimeButton addTarget:self action:@selector(toggleKeepTime) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.keepTimeButton];
@@ -145,9 +145,8 @@ static NSDate *FLUDateFromSetting(id raw) {
 }
 - (void)toggleKeepTime {
     self.keepTime = !self.keepTime;
-    [self.keepTimeButton setTitle:(self.keepTime ? @"Не менять время: вкл." : @"Не менять время: выкл.") forState:UIControlStateNormal];
-    if (self.keepTime) self.datePicker.datePickerMode = UIDatePickerModeDate;
-    else self.datePicker.datePickerMode = UIDatePickerModeDateAndTime;
+    [self.keepTimeButton setTitle:(self.keepTime ? @"Не менять дату и время: вкл." : @"Не менять дату и время: выкл.") forState:UIControlStateNormal];
+    self.datePicker.enabled = !self.keepTime;
 }
 - (BOOL)writeApps:(NSDictionary *)apps {
     NSMutableDictionary *settings = [FLUReadSettings() mutableCopy];
@@ -164,12 +163,7 @@ static NSDate *FLUDateFromSetting(id raw) {
     NSDate *dateToSave = self.datePicker.date;
     if (self.keepTime) {
         NSDictionary *oldEntry = [existingApps isKindOfClass:[NSDictionary class]] ? existingApps[self.bundleIdentifier] : nil;
-        NSDate *oldDate = FLUDateFromSetting(oldEntry[@"Date"]) ?: FLUDateFromSetting(FLUReadSettings()[@"FixedDate"]) ?: [NSDate date];
-        NSCalendar *calendar = [NSCalendar currentCalendar];
-        NSDateComponents *time = [calendar components:(NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond) fromDate:oldDate];
-        NSDateComponents *day = [calendar components:(NSCalendarUnitYear | NSCalendarUnitMonth | NSCalendarUnitDay) fromDate:dateToSave];
-        day.hour = time.hour; day.minute = time.minute; day.second = time.second;
-        dateToSave = [calendar dateFromComponents:day] ?: dateToSave;
+        dateToSave = FLUDateFromSetting(oldEntry[@"Date"]) ?: FLUDateFromSetting(FLUReadSettings()[@"FixedDate"]) ?: [NSDate date];
     }
     apps[self.bundleIdentifier] = @{@"Mode": mode, @"Date": [formatter stringFromDate:dateToSave]};
     if (![self writeApps:apps]) {
