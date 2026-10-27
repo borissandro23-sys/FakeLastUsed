@@ -201,11 +201,23 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
     for (id proxy in installed) {
         NSString *bundleID = nil;
         NSString *name = nil;
+        UIImage *icon = nil;
         SEL idSelector = NSSelectorFromString(@"applicationIdentifier");
         SEL nameSelector = NSSelectorFromString(@"localizedName");
+        SEL iconSelector = NSSelectorFromString(@"iconDataForVariant:");
         if ([proxy respondsToSelector:idSelector]) bundleID = ((id (*)(id, SEL))objc_msgSend)(proxy, idSelector);
         if ([proxy respondsToSelector:nameSelector]) name = ((id (*)(id, SEL))objc_msgSend)(proxy, nameSelector);
-        if (bundleID.length) [result addObject:@{@"id": bundleID, @"name": name.length ? name : bundleID}];
+        if ([proxy respondsToSelector:iconSelector]) {
+            NSData *iconData = ((id (*)(id, SEL, NSInteger))objc_msgSend)(proxy, iconSelector, 2);
+            if (![iconData isKindOfClass:[NSData class]] || iconData.length == 0)
+                iconData = ((id (*)(id, SEL, NSInteger))objc_msgSend)(proxy, iconSelector, 0);
+            if ([iconData isKindOfClass:[NSData class]]) icon = [UIImage imageWithData:iconData];
+        }
+        if (bundleID.length) {
+            NSMutableDictionary *app = [@{@"id": bundleID, @"name": name.length ? name : bundleID} mutableCopy];
+            if (icon) app[@"icon"] = icon;
+            [result addObject:app];
+        }
     }
     [result sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
         return [a[@"name"] localizedCaseInsensitiveCompare:b[@"name"]];
@@ -257,6 +269,10 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
     NSDictionary *app = self.visibleApps[indexPath.row];
     cell.textLabel.text = app[@"name"];
     cell.detailTextLabel.text = app[@"id"];
+    cell.imageView.image = [app[@"icon"] isKindOfClass:[UIImage class]] ? app[@"icon"] : nil;
+    cell.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    cell.imageView.layer.cornerRadius = 8.0;
+    cell.imageView.clipsToBounds = YES;
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     return cell;
 }
