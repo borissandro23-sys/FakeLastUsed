@@ -70,6 +70,7 @@ static NSDate *FLUDateFromSetting(id raw) {
 @property (nonatomic, copy) NSString *bundleIdentifier;
 @property (nonatomic, strong) UISegmentedControl *modeControl;
 @property (nonatomic, strong) UIDatePicker *datePicker;
+@property (nonatomic, strong) UIDatePicker *timePicker;
 @property (nonatomic, strong) UIButton *keepTimeButton;
 @property (nonatomic, assign) BOOL keepTime;
 - (instancetype)initWithBundleIdentifier:(NSString *)bundleIdentifier;
@@ -86,44 +87,77 @@ static NSDate *FLUDateFromSetting(id raw) {
     self.title = self.bundleIdentifier;
     self.view.backgroundColor = [UIColor systemBackgroundColor];
 
+    UIScrollView *scrollView = [[UIScrollView alloc] init];
+    scrollView.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:scrollView];
+    UIView *contentView = [[UIView alloc] init];
+    contentView.translatesAutoresizingMaskIntoConstraints = NO;
+    [scrollView addSubview:contentView];
+    [NSLayoutConstraint activateConstraints:@[
+        [scrollView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [scrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [scrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [scrollView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [contentView.topAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.topAnchor],
+        [contentView.leadingAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.leadingAnchor],
+        [contentView.trailingAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.trailingAnchor],
+        [contentView.bottomAnchor constraintEqualToAnchor:scrollView.contentLayoutGuide.bottomAnchor],
+        [contentView.widthAnchor constraintEqualToAnchor:scrollView.frameLayoutGuide.widthAnchor]
+    ]];
+
     UILabel *modeLabel = [[UILabel alloc] init];
     modeLabel.text = @"Режим для этого приложения";
     modeLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
     modeLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:modeLabel];
+    [contentView addSubview:modeLabel];
 
     self.modeControl = [[UISegmentedControl alloc] initWithItems:@[@"Сейчас", @"Не использ.", @"Дата"]];
     self.modeControl.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:self.modeControl];
+    [contentView addSubview:self.modeControl];
 
     UILabel *dateLabel = [[UILabel alloc] init];
     dateLabel.text = @"Фиксированная дата";
     dateLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
     dateLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:dateLabel];
+    [contentView addSubview:dateLabel];
 
     self.datePicker = [[UIDatePicker alloc] init];
-    self.datePicker.datePickerMode = UIDatePickerModeDateAndTime;
-    if (@available(iOS 13.4, *)) self.datePicker.preferredDatePickerStyle = UIDatePickerStyleWheels;
-    // Use a locale with a compact date representation to avoid displaying the weekday.
-    self.datePicker.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+    self.datePicker.datePickerMode = UIDatePickerModeDate;
+    if (@available(iOS 14.0, *)) {
+        self.datePicker.preferredDatePickerStyle = UIDatePickerStyleInline;
+    } else if (@available(iOS 13.4, *)) {
+        self.datePicker.preferredDatePickerStyle = UIDatePickerStyleWheels;
+    }
+    self.datePicker.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"ru_RU"];
     self.datePicker.calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
-    // Allow selecting any year; do not cap the picker at the current date.
     self.datePicker.maximumDate = nil;
     self.datePicker.minimumDate = nil;
     self.datePicker.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:self.datePicker];
+    [contentView addSubview:self.datePicker];
+
+    UILabel *timeLabel = [[UILabel alloc] init];
+    timeLabel.text = @"Время";
+    timeLabel.font = [UIFont preferredFontForTextStyle:UIFontTextStyleHeadline];
+    timeLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [contentView addSubview:timeLabel];
+
+    self.timePicker = [[UIDatePicker alloc] init];
+    self.timePicker.datePickerMode = UIDatePickerModeTime;
+    if (@available(iOS 13.4, *)) self.timePicker.preferredDatePickerStyle = UIDatePickerStyleWheels;
+    self.timePicker.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"ru_RU"];
+    self.timePicker.translatesAutoresizingMaskIntoConstraints = NO;
+    [contentView addSubview:self.timePicker];
 
     self.keepTimeButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.keepTimeButton setTitle:@"Не менять дату и время: выкл." forState:UIControlStateNormal];
     self.keepTimeButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.keepTimeButton addTarget:self action:@selector(toggleKeepTime) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.keepTimeButton];
+    [contentView addSubview:self.keepTimeButton];
 
     [NSLayoutConstraint activateConstraints:@[
-        [modeLabel.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:24],
-        [modeLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:16],
-        [modeLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
+        [modeLabel.topAnchor constraintEqualToAnchor:contentView.topAnchor constant:24],
+        [modeLabel.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:16],
+        [modeLabel.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-16],
         [self.modeControl.topAnchor constraintEqualToAnchor:modeLabel.bottomAnchor constant:12],
         [self.modeControl.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:16],
         [self.modeControl.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
@@ -131,10 +165,17 @@ static NSDate *FLUDateFromSetting(id raw) {
         [dateLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:16],
         [dateLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
         [self.datePicker.topAnchor constraintEqualToAnchor:dateLabel.bottomAnchor constant:8],
-        [self.datePicker.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.datePicker.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [self.keepTimeButton.topAnchor constraintEqualToAnchor:self.datePicker.bottomAnchor constant:8],
-        [self.keepTimeButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor]
+        [self.datePicker.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:8],
+        [self.datePicker.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-8],
+        [timeLabel.topAnchor constraintEqualToAnchor:self.datePicker.bottomAnchor constant:12],
+        [timeLabel.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor constant:16],
+        [timeLabel.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor constant:-16],
+        [self.timePicker.topAnchor constraintEqualToAnchor:timeLabel.bottomAnchor constant:4],
+        [self.timePicker.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor],
+        [self.timePicker.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor],
+        [self.keepTimeButton.topAnchor constraintEqualToAnchor:self.timePicker.bottomAnchor constant:8],
+        [self.keepTimeButton.centerXAnchor constraintEqualToAnchor:contentView.centerXAnchor],
+        [self.keepTimeButton.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor constant:-24]
     ]];
 
     NSDictionary *settings = FLUReadSettings();
@@ -144,7 +185,9 @@ static NSDate *FLUDateFromSetting(id raw) {
     if ([mode isEqualToString:@"justnow"]) self.modeControl.selectedSegmentIndex = 0;
     else if ([mode isEqualToString:@"never"]) self.modeControl.selectedSegmentIndex = 1;
     else self.modeControl.selectedSegmentIndex = 2;
-    self.datePicker.date = FLUDateFromSetting(entry[@"Date"]) ?: FLUDateFromSetting(settings[@"FixedDate"]) ?: [NSDate date];
+    NSDate *initialDate = FLUDateFromSetting(entry[@"Date"]) ?: FLUDateFromSetting(settings[@"FixedDate"]) ?: [NSDate date];
+    self.datePicker.date = initialDate;
+    self.timePicker.date = initialDate;
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Сохранить" style:UIBarButtonItemStyleDone target:self action:@selector(save)];
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Удалить" style:UIBarButtonItemStylePlain target:self action:@selector(removeOverride)];
 }
@@ -152,6 +195,7 @@ static NSDate *FLUDateFromSetting(id raw) {
     self.keepTime = !self.keepTime;
     [self.keepTimeButton setTitle:(self.keepTime ? @"Не менять дату и время: вкл." : @"Не менять дату и время: выкл.") forState:UIControlStateNormal];
     self.datePicker.enabled = !self.keepTime;
+    self.timePicker.enabled = !self.keepTime;
 }
 - (BOOL)writeApps:(NSDictionary *)apps {
     NSMutableDictionary *settings = [FLUReadSettings() mutableCopy];
@@ -166,6 +210,13 @@ static NSDate *FLUDateFromSetting(id raw) {
     NSString *mode = self.modeControl.selectedSegmentIndex == 0 ? @"justnow" : (self.modeControl.selectedSegmentIndex == 1 ? @"never" : @"fixed");
     NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
     NSDate *dateToSave = self.datePicker.date;
+    NSCalendar *calendar = [NSCalendar calendarWithIdentifier:NSCalendarIdentifierGregorian];
+    NSDateComponents *dateComponents = [calendar components:(NSCalendarUnitYear | NSCalendarUnitMonth | NSCalendarUnitDay) fromDate:self.datePicker.date];
+    NSDateComponents *timeComponents = [calendar components:(NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond) fromDate:self.timePicker.date];
+    dateComponents.hour = timeComponents.hour;
+    dateComponents.minute = timeComponents.minute;
+    dateComponents.second = timeComponents.second;
+    dateToSave = [calendar dateFromComponents:dateComponents] ?: dateToSave;
     if (self.keepTime) {
         NSDictionary *oldEntry = [existingApps isKindOfClass:[NSDictionary class]] ? existingApps[self.bundleIdentifier] : nil;
         dateToSave = FLUDateFromSetting(oldEntry[@"Date"]) ?: FLUDateFromSetting(FLUReadSettings()[@"FixedDate"]) ?: [NSDate date];
