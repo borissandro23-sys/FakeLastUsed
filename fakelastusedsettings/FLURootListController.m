@@ -140,7 +140,8 @@ static NSDate *FLUDateFromSetting(id raw) {
     return YES;
 }
 - (void)save {
-    NSMutableDictionary *apps = [[FLUReadSettings()[@"AppDates"] isKindOfClass:[NSDictionary class]] ? [FLUReadSettings()[@"AppDates"] mutableCopy] : [NSMutableDictionary new] mutableCopy];
+    NSDictionary *existingApps = FLUReadSettings()[@"AppDates"];
+    NSMutableDictionary *apps = [existingApps isKindOfClass:[NSDictionary class]] ? [existingApps mutableCopy] : [NSMutableDictionary new];
     NSString *mode = self.modeControl.selectedSegmentIndex == 0 ? @"justnow" : (self.modeControl.selectedSegmentIndex == 1 ? @"never" : @"fixed");
     NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
     apps[self.bundleIdentifier] = @{@"Mode": mode, @"Date": [formatter stringFromDate:self.datePicker.date]};
@@ -178,7 +179,8 @@ static NSDate *FLUDateFromSetting(id raw) {
 }
 - (void)reloadApps {
     NSDictionary *apps = FLUReadSettings()[@"AppDates"];
-    self.bundleIdentifiers = [[apps isKindOfClass:[NSDictionary class]] ? [apps allKeys] : @[] sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+    NSArray *keys = [apps isKindOfClass:[NSDictionary class]] ? [apps allKeys] : @[];
+    self.bundleIdentifiers = [keys sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
     [self.tableView reloadData];
 }
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.bundleIdentifiers.count + 1; }
