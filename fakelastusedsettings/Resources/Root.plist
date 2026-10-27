@@ -6,9 +6,6 @@
 	<array>
 		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Хранилище iPhone — «Последнее использование»</string><key>footerText</key><string>Меняет подпись в Настройки → Основные → Хранилище iPhone. Индивидуальные правила задаются отдельно для каждого Bundle ID.</string></dict>
 		<dict><key>cell</key><string>PSSwitchCell</string><key>default</key><true/><key>defaults</key><string>com.storagefake.lastused</string><key>key</key><string>Enabled</string><key>label</key><string>Включено</string><key>PostNotification</key><string>com.storagefake.lastused/Reload</string></dict>
-		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Режим по умолчанию</string></dict>
-		<dict><key>cell</key><string>PSSegmentCell</string><key>defaults</key><string>com.storagefake.lastused</string><key>key</key><string>Mode</string><key>default</key><string>justnow</string><key>validTitles</key><array><string>Только что</string><string>Не использовалось</string><string>Фикс. дата</string></array><key>validValues</key><array><string>justnow</string><string>never</string><string>fixed</string></array><key>PostNotification</key><string>com.storagefake.lastused/Reload</string></dict>
-		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Фиксированная дата</string><key>footerText</key><string>Дата по умолчанию для приложений без индивидуального правила.</string></dict>
 		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Индивидуальные даты приложений</string><key>footerText</key><string>Задай отдельный режим и дату для каждого приложения. Нужен Bundle ID приложения.</string></dict>
 		<dict><key>cell</key><string>PSButtonCell</string><key>label</key><string>Настроить индивидуальные даты…</string><key>action</key><string>manageAppDates:</string></dict>
 		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Отладка</string></dict>
