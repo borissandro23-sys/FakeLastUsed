@@ -105,6 +105,9 @@ static NSDate *FLUDateFromSetting(id raw) {
     self.datePicker = [[UIDatePicker alloc] init];
     self.datePicker.datePickerMode = UIDatePickerModeDateAndTime;
     if (@available(iOS 13.4, *)) self.datePicker.preferredDatePickerStyle = UIDatePickerStyleWheels;
+    // Use a locale with a compact date representation to avoid displaying the weekday.
+    self.datePicker.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+    self.datePicker.calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
     // Allow selecting any year; do not cap the picker at the current date.
     self.datePicker.maximumDate = nil;
     self.datePicker.minimumDate = nil;
