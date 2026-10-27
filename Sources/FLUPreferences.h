@@ -16,6 +16,10 @@ typedef NS_ENUM(NSInteger, FLUMode) {
 @property (nonatomic, readonly) FLUMode mode;
 @property (nonatomic, readonly, nullable) NSDate *fixedDate;
 @property (nonatomic, readonly) BOOL debugLogging;
+@property (nonatomic, readonly) NSString *listMode;
+@property (nonatomic, readonly) NSSet<NSString *> *blacklist;
+@property (nonatomic, readonly) NSSet<NSString *> *whitelist;
+- (BOOL)shouldSpoofBundleIdentifier:(nullable NSString *)bundleIdentifier;
 @property (nonatomic, readonly) NSDictionary<NSString *, NSDictionary *> *appDates;
 - (BOOL)hasOverrideForBundleIdentifier:(nullable NSString *)bundleIdentifier;
 - (FLUMode)modeForBundleIdentifier:(nullable NSString *)bundleIdentifier;
