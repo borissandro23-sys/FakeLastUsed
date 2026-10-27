@@ -8,11 +8,13 @@
 
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <CoreFoundation/CoreFoundation.h>
 #import "Sources/FLUPreferences.h"
 
 static void FLULog(NSString *fmt, ...) {
     if (![FLUPreferences shared].debugLogging) return;
-    va_list a; va_start(a, fmt);
+    va_list a;
+    va_start(a, fmt);
     NSLogv([@"[FakeLastUsed] " stringByAppendingString:fmt], a);
     va_end(a);
 }
@@ -20,13 +22,17 @@ static void FLULog(NSString *fmt, ...) {
 static NSDate *FLUSpoofedDate(void) {
     FLUPreferences *p = [FLUPreferences shared];
     if (!p.enabled) return nil;
+
     switch (p.mode) {
         case FLUModeJustNow:
             return [NSDate date];
+
         case FLUModeNeverUsed:
-            return nil; // many UIs map nil → "Never Used"
+            return nil;
+
         case FLUModeFixedDate:
             return p.fixedDate;
+
         default:
             return nil;
     }
@@ -35,11 +41,14 @@ static NSDate *FLUSpoofedDate(void) {
 static NSString *FLUSpoofedString(NSString *orig) {
     FLUPreferences *p = [FLUPreferences shared];
     if (!p.enabled) return orig;
+
     switch (p.mode) {
         case FLUModeJustNow:
-            return @"Только что"; // Storage often uses its own formatter; string hooks help when present
+            return @"Только что";
+
         case FLUModeNeverUsed:
             return @"Не использовалось";
+
         case FLUModeFixedDate: {
             NSDateFormatter *f = [[NSDateFormatter alloc] init];
             f.dateStyle = NSDateFormatterMediumStyle;
@@ -47,73 +56,108 @@ static NSString *FLUSpoofedString(NSString *orig) {
             f.locale = [NSLocale currentLocale];
             return [f stringFromDate:p.fixedDate] ?: orig;
         }
+
         default:
             return orig;
     }
 }
 
+// C callback вместо C++-лямбды: Tweak.x компилируется через Logos.
+static void FLUHandlePrefsReload(
+    CFNotificationCenterRef center,
+    void *observer,
+    CFStringRef name,
+    const void *object,
+    CFDictionaryRef userInfo
+) {
+    [[FLUPreferences shared] reload];
+}
+
 %ctor {
     [[FLUPreferences shared] reload];
+
     CFNotificationCenterAddObserver(
-        CFNotificationCenterGetDarwinNotifyCenter(), NULL,
-        (CFNotificationCallback)(+[](CFNotificationCenterRef, void *, CFStringRef, const void *, CFDictionaryRef) {
-            [[FLUPreferences shared] reload];
-        }),
+        CFNotificationCenterGetDarwinNotifyCenter(),
+        NULL,
+        FLUHandlePrefsReload,
         CFSTR("com.storagefake.lastused/Reload"),
-        NULL, CFNotificationSuspensionBehaviorCoalesce);
+        NULL,
+        CFNotificationSuspensionBehaviorCoalesce
+    );
+
     FLULog(@"loaded");
 }
 
 // --- Date-based hooks (preferred) ----------------------------------------
 
 %hook STStorageApp
+
 - (NSDate *)lastUsedDate {
-    NSDate *spoof = FLUSpoofedDate();
     if ([FLUPreferences shared].enabled) {
+        NSDate *spoof = FLUSpoofedDate();
         FLULog(@"STStorageApp lastUsedDate spoof=%@", spoof);
-        return spoof; // nil = never for many code paths
-    }
-    return %orig;
-}
-- (NSDate *)lastUsed {
-    NSDate *spoof = FLUSpoofedDate();
-    if ([FLUPreferences shared].enabled) {
         return spoof;
     }
     return %orig;
 }
+
+- (NSDate *)lastUsed {
+    if ([FLUPreferences shared].enabled) {
+        return FLUSpoofedDate();
+    }
+    return %orig;
+}
+
 %end
 
 // Some builds use PSStorageApp / private app records
+
 %hook PSStorageApp
+
 - (NSDate *)lastUsedDate {
-    if ([FLUPreferences shared].enabled) return FLUSpoofedDate();
+    if ([FLUPreferences shared].enabled) {
+        return FLUSpoofedDate();
+    }
     return %orig;
 }
+
 %end
 
 // --- String-based hooks (fallback when UI already formatted) -------------
 
 %hook STStorageAppCell
+
 - (NSString *)lastUsedString {
-    if ([FLUPreferences shared].enabled) return FLUSpoofedString(%orig);
-    return %orig;
+    NSString *original = %orig;
+
+    if ([FLUPreferences shared].enabled) {
+        return FLUSpoofedString(original);
+    }
+
+    return original;
 }
+
 - (NSString *)sizeAndLastUsedString {
-    NSString *o = %orig;
-    if (![FLUPreferences shared].enabled) return o;
-    // Best-effort: replace trailing last-used portion is fragile; prefer date hooks.
-    return o;
+    NSString *original = %orig;
+
+    if (![FLUPreferences shared].enabled) {
+        return original;
+    }
+
+    // Best-effort: replacing the trailing last-used portion is fragile.
+    // Prefer date hooks when available.
+    return original;
 }
+
 %end
 
-// Generic: if a method named *lastUsed* returns NSString on storage classes
-// (device-specific — enable after confirming with class-dump)
+// Reload preferences when Preferences becomes active.
 
-// Reload prefs when Preferences becomes active
 %hook PreferencesAppController
+
 - (void)applicationDidBecomeActive:(id)app {
     %orig;
     [[FLUPreferences shared] reload];
 }
+
 %end
