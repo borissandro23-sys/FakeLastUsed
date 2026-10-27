@@ -4,10 +4,11 @@
 <dict>
 	<key>items</key>
 	<array>
-		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Хранилище iPhone — «Последнее использование»</string><key>footerText</key><string>Меняет подпись в Настройки → Основные → Хранилище iPhone. Индивидуальные правила задаются отдельно для каждого Bundle ID.</string></dict>
+		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Хранилище iPhone — «Последнее использование»</string><key>footerText</key><string>Меняет подпись в Настройки → Основные → Хранилище iPhone. Индивидуальные даты задаются отдельно для каждого приложения. Чёрный и белый списки ограничивают, для каких приложений действует твик.</string></dict>
 		<dict><key>cell</key><string>PSSwitchCell</string><key>default</key><true/><key>defaults</key><string>com.storagefake.lastused</string><key>key</key><string>Enabled</string><key>label</key><string>Включено</string><key>PostNotification</key><string>com.storagefake.lastused/Reload</string></dict>
 		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Индивидуальные даты приложений</string><key>footerText</key><string>Задай отдельный режим и дату для каждого приложения. Нужен Bundle ID приложения.</string></dict>
 		<dict><key>cell</key><string>PSButtonCell</string><key>label</key><string>Настроить индивидуальные даты…</string><key>action</key><string>manageAppDates:</string></dict>
+		<dict><key>cell</key><string>PSButtonCell</string><key>label</key><string>Чёрный и белый списки…</string><key>action</key><string>manageAppLists:</string></dict>
 		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Отладка</string></dict>
 		<dict><key>cell</key><string>PSSwitchCell</string><key>default</key><false/><key>defaults</key><string>com.storagefake.lastused</string><key>key</key><string>DebugLogging</string><key>label</key><string>Лог в syslog</string><key>PostNotification</key><string>com.storagefake.lastused/Reload</string></dict>
 		<dict><key>cell</key><string>PSGroupCell</string><key>footerText</key><string>FakeLastUsed · iOS 15 · rootless. Хуки Storage необходимо проверить на устройстве.</string></dict>
