@@ -4,102 +4,18 @@
 <dict>
 	<key>items</key>
 	<array>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>label</key>
-			<string>Хранилище iPhone — «Последнее использование»</string>
-			<key>footerText</key>
-			<string>Меняет только подпись в Настройки → Основные → Хранилище iPhone. После смены настроек закройте «Настройки» и откройте снова.</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<true/>
-			<key>defaults</key>
-			<string>com.storagefake.lastused</string>
-			<key>key</key>
-			<string>Enabled</string>
-			<key>label</key>
-			<string>Включено</string>
-			<key>PostNotification</key>
-			<string>com.storagefake.lastused/Reload</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>label</key>
-			<string>Режим</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSSegmentCell</string>
-			<key>defaults</key>
-			<string>com.storagefake.lastused</string>
-			<key>key</key>
-			<string>Mode</string>
-			<key>default</key>
-			<string>justnow</string>
-			<key>validTitles</key>
-			<array>
-				<string>Только что</string>
-				<string>Не использовалось</string>
-				<string>Фикс. дата</string>
-			</array>
-			<key>validValues</key>
-			<array>
-				<string>justnow</string>
-				<string>never</string>
-				<string>fixed</string>
-			</array>
-			<key>PostNotification</key>
-			<string>com.storagefake.lastused/Reload</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>label</key>
-			<string>Фиксированная дата</string>
-			<key>footerText</key>
-			<string>Нажмите «Выбрать дату и время», чтобы установить дату колёсиком iOS. Используется в режиме «Фикс. дата».</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSButtonCell</string>
-			<key>label</key>
-			<string>Выбрать дату и время…</string>
-			<key>action</key>
-			<string>chooseFixedDate:</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>label</key>
-			<string>Отладка</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSSwitchCell</string>
-			<key>default</key>
-			<false/>
-			<key>defaults</key>
-			<string>com.storagefake.lastused</string>
-			<key>key</key>
-			<string>DebugLogging</string>
-			<key>label</key>
-			<string>Лог в syslog</string>
-			<key>PostNotification</key>
-			<string>com.storagefake.lastused/Reload</string>
-		</dict>
-		<dict>
-			<key>cell</key>
-			<string>PSGroupCell</string>
-			<key>footerText</key>
-			<string>FakeLastUsed · iOS 15 · rootless. Хуки Storage нужно проверить на вашей версии iOS.</string>
-		</dict>
+		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Хранилище iPhone — «Последнее использование»</string><key>footerText</key><string>Меняет подпись в Настройки → Основные → Хранилище iPhone. Индивидуальные правила задаются отдельно для каждого Bundle ID.</string></dict>
+		<dict><key>cell</key><string>PSSwitchCell</string><key>default</key><true/><key>defaults</key><string>com.storagefake.lastused</string><key>key</key><string>Enabled</string><key>label</key><string>Включено</string><key>PostNotification</key><string>com.storagefake.lastused/Reload</string></dict>
+		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Режим по умолчанию</string></dict>
+		<dict><key>cell</key><string>PSSegmentCell</string><key>defaults</key><string>com.storagefake.lastused</string><key>key</key><string>Mode</string><key>default</key><string>justnow</string><key>validTitles</key><array><string>Только что</string><string>Не использовалось</string><string>Фикс. дата</string></array><key>validValues</key><array><string>justnow</string><string>never</string><string>fixed</string></array><key>PostNotification</key><string>com.storagefake.lastused/Reload</string></dict>
+		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Фиксированная дата</string><key>footerText</key><string>Дата по умолчанию для приложений без индивидуального правила.</string></dict>
+		<dict><key>cell</key><string>PSButtonCell</string><key>label</key><string>Выбрать дату и время…</string><key>action</key><string>chooseFixedDate:</string></dict>
+		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Индивидуальные даты приложений</string><key>footerText</key><string>Задай отдельный режим и дату для каждого приложения. Нужен Bundle ID приложения.</string></dict>
+		<dict><key>cell</key><string>PSButtonCell</string><key>label</key><string>Настроить индивидуальные даты…</string><key>action</key><string>manageAppDates:</string></dict>
+		<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>Отладка</string></dict>
+		<dict><key>cell</key><string>PSSwitchCell</string><key>default</key><false/><key>defaults</key><string>com.storagefake.lastused</string><key>key</key><string>DebugLogging</string><key>label</key><string>Лог в syslog</string><key>PostNotification</key><string>com.storagefake.lastused/Reload</string></dict>
+		<dict><key>cell</key><string>PSGroupCell</string><key>footerText</key><string>FakeLastUsed · iOS 15 · rootless. Хуки Storage необходимо проверить на устройстве.</string></dict>
 	</array>
-	<key>title</key>
-	<string>FakeLastUsed</string>
+	<key>title</key><string>FakeLastUsed</string>
 </dict>
 </plist>
