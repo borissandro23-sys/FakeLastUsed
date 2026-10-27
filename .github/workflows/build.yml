@@ -1,4 +1,4 @@
-name: Build CelosiaDepth (rootless)
+name: Build Tweak (rootless)
 
 on:
   push:
