@@ -22,50 +22,6 @@ static NSDate *FLUDateFromSetting(id raw) {
     return [formatter dateFromString:raw];
 }
 
-@interface FLUDatePickerController : UIViewController
-@property (nonatomic, strong) UIDatePicker *datePicker;
-@end
-
-@implementation FLUDatePickerController
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    self.title = @"Дата последнего использования";
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
-    self.datePicker = [[UIDatePicker alloc] init];
-    self.datePicker.datePickerMode = UIDatePickerModeDateAndTime;
-    if (@available(iOS 13.4, *)) self.datePicker.preferredDatePickerStyle = UIDatePickerStyleWheels;
-    self.datePicker.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:self.datePicker];
-    [NSLayoutConstraint activateConstraints:@[
-        [self.datePicker.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.datePicker.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [self.datePicker.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor]
-    ]];
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Сохранить" style:UIBarButtonItemStyleDone target:self action:@selector(saveDate)];
-    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Отмена" style:UIBarButtonItemStylePlain target:self action:@selector(cancel)];
-}
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    id raw = FLUReadSettings()[@"FixedDate"];
-    self.datePicker.date = FLUDateFromSetting(raw) ?: [NSDate date];
-    self.datePicker.maximumDate = [NSDate date];
-}
-- (void)saveDate {
-    NSMutableDictionary *settings = [FLUReadSettings() mutableCopy];
-    NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
-    settings[@"FixedDate"] = [formatter stringFromDate:self.datePicker.date];
-    if (![settings writeToFile:FLUPreferencesPath atomically:YES]) {
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Ошибка" message:@"Не удалось сохранить дату. Проверьте права доступа к файлу настроек." preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-        [self presentViewController:alert animated:YES completion:nil];
-        return;
-    }
-    FLUPostReload();
-    [self.navigationController popViewControllerAnimated:YES];
-}
-- (void)cancel { [self.navigationController popViewControllerAnimated:YES]; }
-@end
-
 @interface FLUAppDateEditorController : UIViewController
 @property (nonatomic, copy) NSString *bundleIdentifier;
 @property (nonatomic, strong) UISegmentedControl *modeControl;
@@ -185,7 +141,7 @@ static NSDate *FLUDateFromSetting(id raw) {
     if ([mode isEqualToString:@"justnow"]) self.modeControl.selectedSegmentIndex = 0;
     else if ([mode isEqualToString:@"never"]) self.modeControl.selectedSegmentIndex = 1;
     else self.modeControl.selectedSegmentIndex = 2;
-    NSDate *initialDate = FLUDateFromSetting(entry[@"Date"]) ?: FLUDateFromSetting(settings[@"FixedDate"]) ?: [NSDate date];
+    NSDate *initialDate = FLUDateFromSetting(entry[@"Date"]) ?: [NSDate date];
     self.datePicker.date = initialDate;
     self.timePicker.date = initialDate;
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Сохранить" style:UIBarButtonItemStyleDone target:self action:@selector(save)];
@@ -219,7 +175,7 @@ static NSDate *FLUDateFromSetting(id raw) {
     dateToSave = [calendar dateFromComponents:dateComponents] ?: dateToSave;
     if (self.keepTime) {
         NSDictionary *oldEntry = [existingApps isKindOfClass:[NSDictionary class]] ? existingApps[self.bundleIdentifier] : nil;
-        dateToSave = FLUDateFromSetting(oldEntry[@"Date"]) ?: FLUDateFromSetting(FLUReadSettings()[@"FixedDate"]) ?: [NSDate date];
+        dateToSave = FLUDateFromSetting(oldEntry[@"Date"]) ?: [NSDate date];
     }
     apps[self.bundleIdentifier] = @{@"Mode": mode, @"Date": [formatter stringFromDate:dateToSave]};
     if (![self writeApps:apps]) {
@@ -388,9 +344,6 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     self.navigationItem.title = @"FakeLastUsed";
-}
-- (void)chooseFixedDate:(PSSpecifier *)specifier {
-    [self.navigationController pushViewController:[[FLUDatePickerController alloc] init] animated:YES];
 }
 - (void)manageAppDates:(PSSpecifier *)specifier {
     [self.navigationController pushViewController:[[FLUAppDatesController alloc] initWithStyle:UITableViewStyleInsetGrouped] animated:YES];
