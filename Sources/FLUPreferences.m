@@ -50,10 +50,12 @@ static FLUMode FLUModeFromValue(id raw, FLUMode fallback) {
     NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:kPath] ?: @{};
     _enabled = d[@"Enabled"] ? [d[@"Enabled"] boolValue] : YES;
     _debugLogging = d[@"DebugLogging"] ? [d[@"DebugLogging"] boolValue] : NO;
-    _mode = FLUModeFromValue(d[@"Mode"] ?: @"justnow", FLUModeJustNow);
+    // Global default mode is removed; apps without an override use “just now”.
+    _mode = FLUModeJustNow;
     if (_mode == FLUModeDisabled) _enabled = NO;
 
-    _fixedDate = FLUDateFromValue(d[@"FixedDate"]);
+    // Fixed dates are configured per app only.
+    _fixedDate = nil;
     if (!_fixedDate) _fixedDate = [NSDate dateWithTimeIntervalSince1970:1577836800];
 
     id appDates = d[@"AppDates"];
