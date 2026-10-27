@@ -346,6 +346,117 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
 }
 @end
 
+@interface FLUAppListsController : UITableViewController <UISearchResultsUpdating>
+@property (nonatomic, copy) NSArray<NSDictionary *> *allApps;
+@property (nonatomic, copy) NSArray<NSDictionary *> *visibleApps;
+@property (nonatomic, strong) UISearchController *searchController;
+@property (nonatomic, strong) UISegmentedControl *modeControl;
+@end
+
+@implementation FLUAppListsController
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.title = @"Чёрный и белый списки";
+    self.modeControl = [[UISegmentedControl alloc] initWithItems:@[@"Все", @"Чёрный", @"Белый"]];
+    self.modeControl.frame = CGRectMake(16, 8, self.view.bounds.size.width - 32, 32);
+    self.modeControl.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    [self.modeControl addTarget:self action:@selector(modeChanged) forControlEvents:UIControlEventValueChanged];
+    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 48)];
+    header.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    [header addSubview:self.modeControl];
+    self.tableView.tableHeaderView = header;
+
+    self.searchController = [[UISearchController alloc] initWithSearchResultsController:nil];
+    self.searchController.searchResultsUpdater = self;
+    self.searchController.obscuresBackgroundDuringPresentation = NO;
+    self.searchController.searchBar.placeholder = @"Поиск приложения";
+    self.navigationItem.searchController = self.searchController;
+    self.definesPresentationContext = YES;
+    [self reloadApps];
+}
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self refreshMode];
+    [self reloadApps];
+}
+- (NSDictionary *)settings {
+    return FLUReadSettings();
+}
+- (void)refreshMode {
+    NSString *mode = [self settings][@"ListMode"];
+    if ([mode isEqualToString:@"blacklist"]) self.modeControl.selectedSegmentIndex = 1;
+    else if ([mode isEqualToString:@"whitelist"]) self.modeControl.selectedSegmentIndex = 2;
+    else self.modeControl.selectedSegmentIndex = 0;
+}
+- (void)modeChanged {
+    NSArray *modes = @[@"all", @"blacklist", @"whitelist"];
+    NSInteger idx = self.modeControl.selectedSegmentIndex;
+    if (idx < 0 || idx >= (NSInteger)modes.count) idx = 0;
+    NSMutableDictionary *settings = [FLUReadSettings() mutableCopy];
+    settings[@"ListMode"] = modes[idx];
+    if ([settings writeToFile:FLUPreferencesPath atomically:YES]) FLUPostReload();
+    [self.tableView reloadData];
+}
+- (void)reloadApps {
+    self.allApps = FLUInstalledApps();
+    [self updateSearchResultsForSearchController:self.searchController];
+}
+- (void)updateSearchResultsForSearchController:(UISearchController *)searchController {
+    NSString *query = searchController.searchBar.text ?: @"";
+    if (query.length == 0) self.visibleApps = self.allApps;
+    else self.visibleApps = [self.allApps filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(NSDictionary *app, NSDictionary *bindings) {
+        return [app[@"name"] localizedCaseInsensitiveContainsString:query] || [app[@"id"] localizedCaseInsensitiveContainsString:query];
+    }]];
+    [self.tableView reloadData];
+}
+- (NSSet<NSString *> *)membersForCurrentList {
+    NSString *key = self.modeControl.selectedSegmentIndex == 1 ? @"Blacklist" : @"Whitelist";
+    id raw = [self settings][key];
+    return [raw isKindOfClass:[NSArray class]] ? [NSSet setWithArray:raw] : [NSSet set];
+}
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    return self.visibleApps.count;
+}
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"AppListCell"];
+    if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"AppListCell"];
+    NSDictionary *app = self.visibleApps[indexPath.row];
+    cell.textLabel.text = app[@"name"];
+    cell.detailTextLabel.text = app[@"id"];
+    cell.imageView.image = [app[@"icon"] isKindOfClass:[UIImage class]] ? app[@"icon"] : nil;
+    cell.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    cell.imageView.layer.cornerRadius = 8.0;
+    cell.imageView.clipsToBounds = YES;
+    if (self.modeControl.selectedSegmentIndex == 0) {
+        cell.accessoryType = UITableViewCellAccessoryNone;
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    } else {
+        cell.accessoryType = [[self membersForCurrentList] containsObject:app[@"id"]] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    }
+    return cell;
+}
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (self.modeControl.selectedSegmentIndex == 0) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Выбери список" message:@"Переключись на «Чёрный» или «Белый», чтобы добавить или убрать приложение." preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    NSDictionary *app = self.visibleApps[indexPath.row];
+    NSString *key = self.modeControl.selectedSegmentIndex == 1 ? @"Blacklist" : @"Whitelist";
+    NSMutableDictionary *settings = [FLUReadSettings() mutableCopy];
+    NSMutableSet<NSString *> *members = [NSMutableSet setWithArray:[settings[key] isKindOfClass:[NSArray class]] ? settings[key] : @[]];
+    NSString *bundleID = app[@"id"];
+    if ([members containsObject:bundleID]) [members removeObject:bundleID];
+    else [members addObject:bundleID];
+    settings[key] = [[members allObjects] sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+    if ([settings writeToFile:FLUPreferencesPath atomically:YES]) FLUPostReload();
+    [self.tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+}
+@end
+
 @implementation FLURootListController
 - (NSArray *)specifiers {
     if (!_specifiers) _specifiers = [self loadSpecifiersFromPlistName:@"Root" target:self];
@@ -354,6 +465,9 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     self.navigationItem.title = @"FakeLastUsed";
+}
+- (void)manageAppLists:(PSSpecifier *)specifier {
+    [self.navigationController pushViewController:[[FLUAppListsController alloc] initWithStyle:UITableViewStyleInsetGrouped] animated:YES];
 }
 - (void)manageAppDates:(PSSpecifier *)specifier {
     [self.navigationController pushViewController:[[FLUAppDatesController alloc] initWithStyle:UITableViewStyleInsetGrouped] animated:YES];
