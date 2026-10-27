@@ -240,6 +240,16 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
                 else if ([nestedData isKindOfClass:[UIImage class]]) icon = nestedData;
             }
         }
+        // UIKit fallback: LaunchServices iconDataForVariant: may return nil on some iOS 15 builds.
+        if (!icon && bundleID.length) {
+            SEL imageSelector = NSSelectorFromString(@"_applicationIconImageForBundleIdentifier:format:scale:");
+            if ([UIImage respondsToSelector:imageSelector]) {
+                icon = ((id (*)(id, SEL, id, NSInteger, CGFloat))objc_msgSend)(
+                    [UIImage class], imageSelector, bundleID, 0, [UIScreen mainScreen].scale
+                );
+            }
+        }
+
         if (bundleID.length) {
             NSMutableDictionary *app = [@{@"id": bundleID, @"name": name.length ? name : bundleID} mutableCopy];
             if (icon) app[@"icon"] = icon;
