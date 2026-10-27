@@ -60,25 +60,17 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>label</key>
-			<string>Фиксированная дата (ISO-8601)</string>
+			<string>Фиксированная дата</string>
 			<key>footerText</key>
-			<string>Используется только в режиме «Фикс. дата». Пример: 2024-06-15T12:00:00Z</string>
+			<string>Нажмите «Выбрать дату и время», чтобы установить дату колёсиком iOS. Используется в режиме «Фикс. дата».</string>
 		</dict>
 		<dict>
 			<key>cell</key>
-			<string>PSEditTextCell</string>
-			<key>defaults</key>
-			<string>com.storagefake.lastused</string>
-			<key>key</key>
-			<string>FixedDate</string>
-			<key>default</key>
-			<string>2024-06-15T12:00:00Z</string>
-			<key>placeholder</key>
-			<string>2024-06-15T12:00:00Z</string>
-			<key>noAutoCorrect</key>
-			<true/>
-			<key>PostNotification</key>
-			<string>com.storagefake.lastused/Reload</string>
+			<string>PSButtonCell</string>
+			<key>label</key>
+			<string>Выбрать дату и время…</string>
+			<key>action</key>
+			<string>chooseFixedDate:</string>
 		</dict>
 		<dict>
 			<key>cell</key>
