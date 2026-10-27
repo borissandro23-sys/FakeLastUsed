@@ -31,6 +31,9 @@ static FLUMode FLUModeFromValue(id raw, FLUMode fallback) {
     NSDate *_fixedDate;
     BOOL _debugLogging;
     NSDictionary<NSString *, NSDictionary *> *_appDates;
+    NSString *_listMode;
+    NSSet<NSString *> *_blacklist;
+    NSSet<NSString *> *_whitelist;
 }
 
 + (instancetype)shared {
@@ -60,13 +63,36 @@ static FLUMode FLUModeFromValue(id raw, FLUMode fallback) {
 
     id appDates = d[@"AppDates"];
     _appDates = [appDates isKindOfClass:[NSDictionary class]] ? [appDates copy] : @{};
+
+    NSString *listMode = [d[@"ListMode"] isKindOfClass:[NSString class]] ? d[@"ListMode"] : @"all";
+    _listMode = [@[@"all", @"blacklist", @"whitelist"] containsObject:listMode] ? [listMode copy] : @"all";
+    id black = d[@"Blacklist"];
+    id white = d[@"Whitelist"];
+    _blacklist = [black isKindOfClass:[NSArray class]] ? [NSSet setWithArray:black] : [NSSet set];
+    _whitelist = [white isKindOfClass:[NSArray class]] ? [NSSet setWithArray:white] : [NSSet set];
 }
 
 - (BOOL)enabled { return _enabled && _mode != FLUModeDisabled; }
 - (FLUMode)mode { return _mode; }
 - (NSDate *)fixedDate { return _fixedDate; }
 - (BOOL)debugLogging { return _debugLogging; }
+- (NSString *)listMode { return _listMode; }
+- (NSSet<NSString *> *)blacklist { return _blacklist; }
+- (NSSet<NSString *> *)whitelist { return _whitelist; }
 - (NSDictionary<NSString *,NSDictionary *> *)appDates { return _appDates; }
+
+- (BOOL)shouldSpoofBundleIdentifier:(NSString *)bundleIdentifier {
+    if (!_enabled || _mode == FLUModeDisabled) return NO;
+    if ([_listMode isEqualToString:@"blacklist"]) {
+        if (bundleIdentifier.length == 0) return NO;
+        return ![_blacklist containsObject:bundleIdentifier];
+    }
+    if ([_listMode isEqualToString:@"whitelist"]) {
+        if (bundleIdentifier.length == 0) return NO;
+        return [_whitelist containsObject:bundleIdentifier];
+    }
+    return YES;
+}
 
 - (BOOL)hasOverrideForBundleIdentifier:(NSString *)bundleIdentifier {
     if (bundleIdentifier.length == 0) return NO;
