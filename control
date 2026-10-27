@@ -1,0 +1,10 @@
+Package: com.storagefake.lastused
+Name: FakeLastUsed
+Version: 0.1.1
+Architecture: iphoneos-arm64
+Description: Spoof Last Used in iPhone Storage. Separate Settings pane (PreferenceLoader).
+Maintainer: FakeLastUsed
+Author: FakeLastUsed
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000), preferenceloader, firmware (>= 15.0), firmware (<< 16.0)
+Priority: optional

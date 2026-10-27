@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Хранилище iPhone — «Последнее использование»</string>
+			<key>footerText</key>
+			<string>Меняет только подпись в Настройки → Основные → Хранилище iPhone. После смены настроек закройте «Настройки» и откройте снова.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.storagefake.lastused</string>
+			<key>key</key>
+			<string>Enabled</string>
+			<key>label</key>
+			<string>Включено</string>
+			<key>PostNotification</key>
+			<string>com.storagefake.lastused/Reload</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Режим</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSegmentCell</string>
+			<key>defaults</key>
+			<string>com.storagefake.lastused</string>
+			<key>key</key>
+			<string>Mode</string>
+			<key>default</key>
+			<string>justnow</string>
+			<key>validTitles</key>
+			<array>
+				<string>Только что</string>
+				<string>Не использовалось</string>
+				<string>Фикс. дата</string>
+			</array>
+			<key>validValues</key>
+			<array>
+				<string>justnow</string>
+				<string>never</string>
+				<string>fixed</string>
+			</array>
+			<key>PostNotification</key>
+			<string>com.storagefake.lastused/Reload</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Фиксированная дата (ISO-8601)</string>
+			<key>footerText</key>
+			<string>Используется только в режиме «Фикс. дата». Пример: 2024-06-15T12:00:00Z</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSEditTextCell</string>
+			<key>defaults</key>
+			<string>com.storagefake.lastused</string>
+			<key>key</key>
+			<string>FixedDate</string>
+			<key>default</key>
+			<string>2024-06-15T12:00:00Z</string>
+			<key>placeholder</key>
+			<string>2024-06-15T12:00:00Z</string>
+			<key>noAutoCorrect</key>
+			<true/>
+			<key>PostNotification</key>
+			<string>com.storagefake.lastused/Reload</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Отладка</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.storagefake.lastused</string>
+			<key>key</key>
+			<string>DebugLogging</string>
+			<key>label</key>
+			<string>Лог в syslog</string>
+			<key>PostNotification</key>
+			<string>com.storagefake.lastused/Reload</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>FakeLastUsed · iOS 15 · rootless. Хуки Storage нужно проверить на вашей версии iOS.</string>
+		</dict>
+	</array>
+	<key>title</key>
+	<string>FakeLastUsed</string>
+</dict>
+</plist>
