@@ -42,7 +42,7 @@ static FLUMode FLUModeForObject(id object) {
 
 static NSDate *FLUSpoofedDate(id object) {
     FLUPreferences *p = [FLUPreferences shared];
-    if (!p.enabled) return nil;
+    if (![p shouldSpoofBundleIdentifier:FLUBundleIdentifier(object)]) return nil;
     switch (FLUModeForObject(object)) {
         case FLUModeJustNow: return [NSDate date];
         case FLUModeNeverUsed: return nil;
@@ -53,7 +53,7 @@ static NSDate *FLUSpoofedDate(id object) {
 
 static NSString *FLUSpoofedString(NSString *orig, id object) {
     FLUPreferences *p = [FLUPreferences shared];
-    if (!p.enabled) return orig;
+    if (![p shouldSpoofBundleIdentifier:FLUBundleIdentifier(object)]) return orig;
     switch (FLUModeForObject(object)) {
         case FLUModeJustNow: return @"Только что";
         case FLUModeNeverUsed: return @"Не использовалось";
@@ -81,7 +81,7 @@ static void FLUHandlePrefsReload(CFNotificationCenterRef center, void *observer,
 
 %hook STStorageApp
 - (NSDate *)lastUsedDate {
-    if ([FLUPreferences shared].enabled) return FLUSpoofedDate(self);
+    if ([[FLUPreferences shared] shouldSpoofBundleIdentifier:FLUBundleIdentifier(self)]) return FLUSpoofedDate(self);
     return %orig;
 }
 - (NSDate *)lastUsed {
@@ -100,7 +100,7 @@ static void FLUHandlePrefsReload(CFNotificationCenterRef center, void *observer,
 %hook STStorageAppCell
 - (NSString *)lastUsedString {
     NSString *original = %orig;
-    if ([FLUPreferences shared].enabled) return FLUSpoofedString(original, self);
+    if ([[FLUPreferences shared] shouldSpoofBundleIdentifier:FLUBundleIdentifier(self)]) return FLUSpoofedString(original, self);
     return original;
 }
 - (NSString *)sizeAndLastUsedString {
