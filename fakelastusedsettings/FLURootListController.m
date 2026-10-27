@@ -261,13 +261,28 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
         SEL idSelector = NSSelectorFromString(@"applicationIdentifier");
         SEL nameSelector = NSSelectorFromString(@"localizedName");
         SEL iconSelector = NSSelectorFromString(@"iconDataForVariant:");
+        SEL iconOptionsSelector = NSSelectorFromString(@"iconDataForVariant:withOptions:");
         if ([proxy respondsToSelector:idSelector]) bundleID = ((id (*)(id, SEL))objc_msgSend)(proxy, idSelector);
         if ([proxy respondsToSelector:nameSelector]) name = ((id (*)(id, SEL))objc_msgSend)(proxy, nameSelector);
-        if ([proxy respondsToSelector:iconSelector]) {
-            NSData *iconData = ((id (*)(id, SEL, NSInteger))objc_msgSend)(proxy, iconSelector, 2);
-            if (![iconData isKindOfClass:[NSData class]] || iconData.length == 0)
-                iconData = ((id (*)(id, SEL, NSInteger))objc_msgSend)(proxy, iconSelector, 0);
-            if ([iconData isKindOfClass:[NSData class]]) icon = [UIImage imageWithData:iconData];
+
+        // Private LaunchServices versions differ: icon selectors may return UIImage or encoded NSData.
+        for (NSInteger variant = 2; variant >= 0 && !icon; variant--) {
+            id iconResult = nil;
+            if ([proxy respondsToSelector:iconSelector]) {
+                iconResult = ((id (*)(id, SEL, NSInteger))objc_msgSend)(proxy, iconSelector, variant);
+            }
+            if ((!iconResult || iconResult == [NSNull null]) && [proxy respondsToSelector:iconOptionsSelector]) {
+                iconResult = ((id (*)(id, SEL, NSInteger, NSDictionary *))objc_msgSend)(proxy, iconOptionsSelector, variant, @{});
+            }
+            if ([iconResult isKindOfClass:[UIImage class]]) {
+                icon = iconResult;
+            } else if ([iconResult isKindOfClass:[NSData class]] && [iconResult length] > 0) {
+                icon = [UIImage imageWithData:iconResult];
+            } else if ([iconResult isKindOfClass:[NSDictionary class]]) {
+                id nestedData = iconResult[@"data"] ?: iconResult[@"imageData"];
+                if ([nestedData isKindOfClass:[NSData class]]) icon = [UIImage imageWithData:nestedData];
+                else if ([nestedData isKindOfClass:[UIImage class]]) icon = nestedData;
+            }
         }
         if (bundleID.length) {
             NSMutableDictionary *app = [@{@"id": bundleID, @"name": name.length ? name : bundleID} mutableCopy];
@@ -316,6 +331,8 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"AppDateCell"];
     if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"AppDateCell"];
+    cell.imageView.image = nil;
+    cell.imageView.contentMode = UIViewContentModeScaleAspectFit;
     if (indexPath.row == self.visibleApps.count) {
         cell.textLabel.text = @"Ввести Bundle ID вручную…";
         cell.detailTextLabel.text = @"Если приложение не появилось в списке";
