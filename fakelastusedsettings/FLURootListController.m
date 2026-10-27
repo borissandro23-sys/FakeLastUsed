@@ -2,6 +2,7 @@
 #import <Preferences/PSSpecifier.h>
 #import <UIKit/UIKit.h>
 #import <CoreFoundation/CoreFoundation.h>
+#import <objc/message.h>
 
 static NSString * const FLUPreferencesPath = @"/var/jb/var/mobile/Library/Preferences/com.storagefake.lastused.plist";
 static CFStringRef const FLUReloadNotification = CFSTR("com.storagefake.lastused/Reload");
@@ -69,6 +70,8 @@ static NSDate *FLUDateFromSetting(id raw) {
 @property (nonatomic, copy) NSString *bundleIdentifier;
 @property (nonatomic, strong) UISegmentedControl *modeControl;
 @property (nonatomic, strong) UIDatePicker *datePicker;
+@property (nonatomic, strong) UIButton *keepTimeButton;
+@property (nonatomic, assign) BOOL keepTime;
 - (instancetype)initWithBundleIdentifier:(NSString *)bundleIdentifier;
 @end
 
@@ -106,6 +109,12 @@ static NSDate *FLUDateFromSetting(id raw) {
     self.datePicker.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.datePicker];
 
+    self.keepTimeButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.keepTimeButton setTitle:@"Не менять время: выкл." forState:UIControlStateNormal];
+    self.keepTimeButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.keepTimeButton addTarget:self action:@selector(toggleKeepTime) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.keepTimeButton];
+
     [NSLayoutConstraint activateConstraints:@[
         [modeLabel.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:24],
         [modeLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:16],
@@ -118,7 +127,9 @@ static NSDate *FLUDateFromSetting(id raw) {
         [dateLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
         [self.datePicker.topAnchor constraintEqualToAnchor:dateLabel.bottomAnchor constant:8],
         [self.datePicker.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.datePicker.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor]
+        [self.datePicker.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.keepTimeButton.topAnchor constraintEqualToAnchor:self.datePicker.bottomAnchor constant:8],
+        [self.keepTimeButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor]
     ]];
 
     NSDictionary *settings = FLUReadSettings();
@@ -132,6 +143,12 @@ static NSDate *FLUDateFromSetting(id raw) {
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Сохранить" style:UIBarButtonItemStyleDone target:self action:@selector(save)];
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Удалить" style:UIBarButtonItemStylePlain target:self action:@selector(removeOverride)];
 }
+- (void)toggleKeepTime {
+    self.keepTime = !self.keepTime;
+    [self.keepTimeButton setTitle:(self.keepTime ? @"Не менять время: вкл." : @"Не менять время: выкл.") forState:UIControlStateNormal];
+    if (self.keepTime) self.datePicker.datePickerMode = UIDatePickerModeDate;
+    else self.datePicker.datePickerMode = UIDatePickerModeDateAndTime;
+}
 - (BOOL)writeApps:(NSDictionary *)apps {
     NSMutableDictionary *settings = [FLUReadSettings() mutableCopy];
     settings[@"AppDates"] = apps;
@@ -144,7 +161,17 @@ static NSDate *FLUDateFromSetting(id raw) {
     NSMutableDictionary *apps = [existingApps isKindOfClass:[NSDictionary class]] ? [existingApps mutableCopy] : [NSMutableDictionary new];
     NSString *mode = self.modeControl.selectedSegmentIndex == 0 ? @"justnow" : (self.modeControl.selectedSegmentIndex == 1 ? @"never" : @"fixed");
     NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
-    apps[self.bundleIdentifier] = @{@"Mode": mode, @"Date": [formatter stringFromDate:self.datePicker.date]};
+    NSDate *dateToSave = self.datePicker.date;
+    if (self.keepTime) {
+        NSDictionary *oldEntry = [existingApps isKindOfClass:[NSDictionary class]] ? existingApps[self.bundleIdentifier] : nil;
+        NSDate *oldDate = FLUDateFromSetting(oldEntry[@"Date"]) ?: FLUDateFromSetting(FLUReadSettings()[@"FixedDate"]) ?: [NSDate date];
+        NSCalendar *calendar = [NSCalendar currentCalendar];
+        NSDateComponents *time = [calendar components:(NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond) fromDate:oldDate];
+        NSDateComponents *day = [calendar components:(NSCalendarUnitYear | NSCalendarUnitMonth | NSCalendarUnitDay) fromDate:dateToSave];
+        day.hour = time.hour; day.minute = time.minute; day.second = time.second;
+        dateToSave = [calendar dateFromComponents:day] ?: dateToSave;
+    }
+    apps[self.bundleIdentifier] = @{@"Mode": mode, @"Date": [formatter stringFromDate:dateToSave]};
     if (![self writeApps:apps]) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Ошибка" message:@"Не удалось сохранить индивидуальные настройки." preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
@@ -162,15 +189,47 @@ static NSDate *FLUDateFromSetting(id raw) {
 }
 @end
 
-@interface FLUAppDatesController : UITableViewController
-@property (nonatomic, copy) NSArray<NSString *> *bundleIdentifiers;
+@interface FLUAppDatesController : UITableViewController <UISearchResultsUpdating>
+@property (nonatomic, copy) NSArray<NSDictionary *> *allApps;
+@property (nonatomic, copy) NSArray<NSDictionary *> *visibleApps;
+@property (nonatomic, strong) UISearchController *searchController;
 @end
+
+static NSArray<NSDictionary *> *FLUInstalledApps(void) {
+    NSMutableArray<NSDictionary *> *result = [NSMutableArray new];
+    Class workspaceClass = NSClassFromString(@"LSApplicationWorkspace");
+    SEL defaultWorkspaceSelector = NSSelectorFromString(@"defaultWorkspace");
+    SEL allAppsSelector = NSSelectorFromString(@"allInstalledApplications");
+    if (!workspaceClass || ![workspaceClass respondsToSelector:defaultWorkspaceSelector]) return result;
+    id workspace = ((id (*)(id, SEL))objc_msgSend)(workspaceClass, defaultWorkspaceSelector);
+    if (![workspace respondsToSelector:allAppsSelector]) return result;
+    id installed = ((id (*)(id, SEL))objc_msgSend)(workspace, allAppsSelector);
+    for (id proxy in installed) {
+        NSString *bundleID = nil;
+        NSString *name = nil;
+        SEL idSelector = NSSelectorFromString(@"applicationIdentifier");
+        SEL nameSelector = NSSelectorFromString(@"localizedName");
+        if ([proxy respondsToSelector:idSelector]) bundleID = ((id (*)(id, SEL))objc_msgSend)(proxy, idSelector);
+        if ([proxy respondsToSelector:nameSelector]) name = ((id (*)(id, SEL))objc_msgSend)(proxy, nameSelector);
+        if (bundleID.length) [result addObject:@{@"id": bundleID, @"name": name.length ? name : bundleID}];
+    }
+    [result sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        return [a[@"name"] localizedCaseInsensitiveCompare:b[@"name"]];
+    }];
+    return result;
+}
 
 @implementation FLUAppDatesController
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Индивидуальные даты";
+    self.title = @"Выбрать приложение";
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStyleInsetGrouped];
+    self.searchController = [[UISearchController alloc] initWithSearchResultsController:nil];
+    self.searchController.searchResultsUpdater = self;
+    self.searchController.obscuresBackgroundDuringPresentation = NO;
+    self.searchController.searchBar.placeholder = @"Поиск приложения";
+    self.navigationItem.searchController = self.searchController;
+    self.definesPresentationContext = YES;
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addApp)];
     [self reloadApps];
 }
@@ -179,39 +238,43 @@ static NSDate *FLUDateFromSetting(id raw) {
     [self reloadApps];
 }
 - (void)reloadApps {
-    NSDictionary *apps = FLUReadSettings()[@"AppDates"];
-    NSArray *keys = [apps isKindOfClass:[NSDictionary class]] ? [apps allKeys] : @[];
-    self.bundleIdentifiers = [keys sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+    self.allApps = FLUInstalledApps();
+    self.visibleApps = self.allApps;
+    [self updateSearchResultsForSearchController:self.searchController];
+}
+- (void)updateSearchResultsForSearchController:(UISearchController *)searchController {
+    NSString *query = searchController.searchBar.text ?: @"";
+    if (query.length == 0) self.visibleApps = self.allApps;
+    else self.visibleApps = [self.allApps filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(NSDictionary *app, NSDictionary *bindings) {
+        return [app[@"name"] localizedCaseInsensitiveContainsString:query] || [app[@"id"] localizedCaseInsensitiveContainsString:query];
+    }]];
     [self.tableView reloadData];
 }
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.bundleIdentifiers.count + 1; }
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section { return self.visibleApps.count + 1; }
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"AppDateCell"];
     if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"AppDateCell"];
-    if (indexPath.row == self.bundleIdentifiers.count) {
-        cell.textLabel.text = @"Добавить приложение по Bundle ID…";
-        cell.detailTextLabel.text = @"Например, com.example.app";
+    if (indexPath.row == self.visibleApps.count) {
+        cell.textLabel.text = @"Ввести Bundle ID вручную…";
+        cell.detailTextLabel.text = @"Если приложение не появилось в списке";
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-    } else {
-        NSString *bundleID = self.bundleIdentifiers[indexPath.row];
-        NSDictionary *entry = FLUReadSettings()[@"AppDates"][bundleID];
-        NSString *mode = [entry[@"Mode"] description];
-        NSString *modeText = [mode isEqualToString:@"never"] ? @"Не использовалось" : ([mode isEqualToString:@"justnow"] ? @"Только что" : @"Фиксированная дата");
-        cell.textLabel.text = bundleID;
-        cell.detailTextLabel.text = modeText;
-        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        return cell;
     }
+    NSDictionary *app = self.visibleApps[indexPath.row];
+    cell.textLabel.text = app[@"name"];
+    cell.detailTextLabel.text = app[@"id"];
+    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     return cell;
 }
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.row == self.bundleIdentifiers.count) { [self addApp]; return; }
-    NSString *bundleID = self.bundleIdentifiers[indexPath.row];
+    if (indexPath.row == self.visibleApps.count) { [self addApp]; return; }
+    NSString *bundleID = self.visibleApps[indexPath.row][@"id"];
     FLUAppDateEditorController *editor = [[FLUAppDateEditorController alloc] initWithBundleIdentifier:bundleID];
     [self.navigationController pushViewController:editor animated:YES];
 }
 - (void)addApp {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Добавить приложение" message:@"Введи Bundle ID приложения. Его можно посмотреть в сведениях о приложении или в списке установленных пакетов." preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Добавить приложение" message:@"Введи Bundle ID приложения." preferredStyle:UIAlertControllerStyleAlert];
     [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
         field.placeholder = @"com.example.app";
         field.autocapitalizationType = UITextAutocapitalizationTypeNone;
