@@ -154,7 +154,8 @@ static NSDate *FLUDateFromSetting(id raw) {
     [self.navigationController popViewControllerAnimated:YES];
 }
 - (void)removeOverride {
-    NSMutableDictionary *apps = [[FLUReadSettings()[@"AppDates"] isKindOfClass:[NSDictionary class]] ? [FLUReadSettings()[@"AppDates"] mutableCopy] : [NSMutableDictionary new] mutableCopy];
+    NSDictionary *existingApps = FLUReadSettings()[@"AppDates"];
+    NSMutableDictionary *apps = [existingApps isKindOfClass:[NSDictionary class]] ? [existingApps mutableCopy] : [NSMutableDictionary new];
     [apps removeObjectForKey:self.bundleIdentifier];
     if (![self writeApps:apps]) return;
     [self.navigationController popViewControllerAnimated:YES];
