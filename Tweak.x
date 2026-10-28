@@ -92,7 +92,10 @@ static void FLUHandlePrefsReload(CFNotificationCenterRef center, void *observer,
 
 %hook PSStorageApp
 - (NSDate *)lastUsedDate {
-    if ([FLUPreferences shared].enabled) return FLUSpoofedDate(self);
+    FLUPreferences *preferences = [FLUPreferences shared];
+    if ([preferences shouldSpoofBundleIdentifier:FLUBundleIdentifier(self)]) {
+        return FLUSpoofedDate(self);
+    }
     return %orig;
 }
 %end
