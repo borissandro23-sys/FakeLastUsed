@@ -223,42 +223,48 @@ static UIImage *FLUIconForBundleIdentifier(NSString *bundleID) {
     return icon;
 }
 
+static NSArray<NSDictionary *> *FLUCachedInstalledApps;
+
 static NSArray<NSDictionary *> *FLUInstalledApps(void) {
-    static NSArray<NSDictionary *> *cachedApps;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSMutableArray<NSDictionary *> *result = [NSMutableArray new];
-        Class workspaceClass = NSClassFromString(@"LSApplicationWorkspace");
-        SEL defaultWorkspaceSelector = NSSelectorFromString(@"defaultWorkspace");
-        SEL allAppsSelector = NSSelectorFromString(@"allInstalledApplications");
-        if (!workspaceClass || ![workspaceClass respondsToSelector:defaultWorkspaceSelector]) {
-            cachedApps = @[];
-            return;
+    if (FLUCachedInstalledApps) return FLUCachedInstalledApps;
+
+    NSMutableArray<NSDictionary *> *result = [NSMutableArray new];
+    Class workspaceClass = NSClassFromString(@"LSApplicationWorkspace");
+    SEL defaultWorkspaceSelector = NSSelectorFromString(@"defaultWorkspace");
+    SEL allAppsSelector = NSSelectorFromString(@"allInstalledApplications");
+    if (!workspaceClass || ![workspaceClass respondsToSelector:defaultWorkspaceSelector]) {
+        FLUCachedInstalledApps = @[];
+        return FLUCachedInstalledApps;
+    }
+    id workspace = ((id (*)(id, SEL))objc_msgSend)(workspaceClass, defaultWorkspaceSelector);
+    if (![workspace respondsToSelector:allAppsSelector]) {
+        FLUCachedInstalledApps = @[];
+        return FLUCachedInstalledApps;
+    }
+    id installed = ((id (*)(id, SEL))objc_msgSend)(workspace, allAppsSelector);
+    for (id proxy in installed) {
+        NSString *bundleID = nil;
+        NSString *name = nil;
+        SEL idSelector = NSSelectorFromString(@"applicationIdentifier");
+        SEL nameSelector = NSSelectorFromString(@"localizedName");
+        if ([proxy respondsToSelector:idSelector]) bundleID = ((id (*)(id, SEL))objc_msgSend)(proxy, idSelector);
+        if ([proxy respondsToSelector:nameSelector]) name = ((id (*)(id, SEL))objc_msgSend)(proxy, nameSelector);
+        if (bundleID.length) {
+            [result addObject:@{@"id": bundleID, @"name": (name.length ? name : bundleID)}];
         }
-        id workspace = ((id (*)(id, SEL))objc_msgSend)(workspaceClass, defaultWorkspaceSelector);
-        if (![workspace respondsToSelector:allAppsSelector]) {
-            cachedApps = @[];
-            return;
-        }
-        id installed = ((id (*)(id, SEL))objc_msgSend)(workspace, allAppsSelector);
-        for (id proxy in installed) {
-            NSString *bundleID = nil;
-            NSString *name = nil;
-            SEL idSelector = NSSelectorFromString(@"applicationIdentifier");
-            SEL nameSelector = NSSelectorFromString(@"localizedName");
-            if ([proxy respondsToSelector:idSelector]) bundleID = ((id (*)(id, SEL))objc_msgSend)(proxy, idSelector);
-            if ([proxy respondsToSelector:nameSelector]) name = ((id (*)(id, SEL))objc_msgSend)(proxy, nameSelector);
-            if (bundleID.length) {
-                [result addObject:@{@"id": bundleID, @"name": (name.length ? name : bundleID)}];
-            }
-        }
-        [result sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
-            return [a[@"name"] localizedCaseInsensitiveCompare:b[@"name"]];
-        }];
-        cachedApps = [result copy];
-    });
-    return cachedApps ?: @[];
+    }
+    [result sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        return [a[@"name"] localizedCaseInsensitiveCompare:b[@"name"]];
+    }];
+    FLUCachedInstalledApps = [result copy];
+    return FLUCachedInstalledApps;
 }
+
+static void FLUClearAppCaches(void) {
+    FLUCachedInstalledApps = nil;
+    [FLUIconCache() removeAllObjects];
+}
+
 
 @implementation FLUAppDatesController
 - (void)viewDidLoad {
@@ -271,11 +277,16 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
     self.searchController.searchBar.placeholder = @"Поиск приложения";
     self.navigationItem.searchController = self.searchController;
     self.definesPresentationContext = YES;
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(refreshApps)];
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(addApp)];
     [self reloadApps];
 }
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self reloadApps];
+}
+- (void)refreshApps {
+    FLUClearAppCaches();
     [self reloadApps];
 }
 - (void)reloadApps {
@@ -370,6 +381,7 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
     self.searchController.searchBar.placeholder = @"Поиск приложения";
     self.navigationItem.searchController = self.searchController;
     self.definesPresentationContext = YES;
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(refreshApps)];
     [self reloadApps];
 }
 - (void)viewWillAppear:(BOOL)animated {
@@ -394,6 +406,10 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
     settings[@"ListMode"] = modes[idx];
     if ([settings writeToFile:FLUPreferencesPath atomically:YES]) FLUPostReload();
     [self.tableView reloadData];
+}
+- (void)refreshApps {
+    FLUClearAppCaches();
+    [self reloadApps];
 }
 - (void)reloadApps {
     self.allApps = FLUInstalledApps();
