@@ -201,65 +201,63 @@ static NSDate *FLUDateFromSetting(id raw) {
 @property (nonatomic, strong) UISearchController *searchController;
 @end
 
+static NSMutableDictionary<NSString *, UIImage *> *FLUIconCache(void) {
+    static NSMutableDictionary<NSString *, UIImage *> *cache;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ cache = [NSMutableDictionary new]; });
+    return cache;
+}
+
+// Load icons only for rows that are actually visible, and reuse them afterwards.
+static UIImage *FLUIconForBundleIdentifier(NSString *bundleID) {
+    if (bundleID.length == 0) return nil;
+    UIImage *cached = FLUIconCache()[bundleID];
+    if (cached) return cached;
+
+    SEL imageSelector = NSSelectorFromString(@"_applicationIconImageForBundleIdentifier:format:scale:");
+    if (![UIImage respondsToSelector:imageSelector]) return nil;
+    UIImage *icon = ((id (*)(id, SEL, id, NSInteger, CGFloat))objc_msgSend)(
+        [UIImage class], imageSelector, bundleID, 0, [UIScreen mainScreen].scale
+    );
+    if (icon) FLUIconCache()[bundleID] = icon;
+    return icon;
+}
+
 static NSArray<NSDictionary *> *FLUInstalledApps(void) {
-    NSMutableArray<NSDictionary *> *result = [NSMutableArray new];
-    Class workspaceClass = NSClassFromString(@"LSApplicationWorkspace");
-    SEL defaultWorkspaceSelector = NSSelectorFromString(@"defaultWorkspace");
-    SEL allAppsSelector = NSSelectorFromString(@"allInstalledApplications");
-    if (!workspaceClass || ![workspaceClass respondsToSelector:defaultWorkspaceSelector]) return result;
-    id workspace = ((id (*)(id, SEL))objc_msgSend)(workspaceClass, defaultWorkspaceSelector);
-    if (![workspace respondsToSelector:allAppsSelector]) return result;
-    id installed = ((id (*)(id, SEL))objc_msgSend)(workspace, allAppsSelector);
-    for (id proxy in installed) {
-        NSString *bundleID = nil;
-        NSString *name = nil;
-        UIImage *icon = nil;
-        SEL idSelector = NSSelectorFromString(@"applicationIdentifier");
-        SEL nameSelector = NSSelectorFromString(@"localizedName");
-        SEL iconSelector = NSSelectorFromString(@"iconDataForVariant:");
-        SEL iconOptionsSelector = NSSelectorFromString(@"iconDataForVariant:withOptions:");
-        if ([proxy respondsToSelector:idSelector]) bundleID = ((id (*)(id, SEL))objc_msgSend)(proxy, idSelector);
-        if ([proxy respondsToSelector:nameSelector]) name = ((id (*)(id, SEL))objc_msgSend)(proxy, nameSelector);
-
-        // Private LaunchServices versions differ: icon selectors may return UIImage or encoded NSData.
-        for (NSInteger variant = 2; variant >= 0 && !icon; variant--) {
-            id iconResult = nil;
-            if ([proxy respondsToSelector:iconSelector]) {
-                iconResult = ((id (*)(id, SEL, NSInteger))objc_msgSend)(proxy, iconSelector, variant);
-            }
-            if ((!iconResult || iconResult == [NSNull null]) && [proxy respondsToSelector:iconOptionsSelector]) {
-                iconResult = ((id (*)(id, SEL, NSInteger, NSDictionary *))objc_msgSend)(proxy, iconOptionsSelector, variant, @{});
-            }
-            if ([iconResult isKindOfClass:[UIImage class]]) {
-                icon = iconResult;
-            } else if ([iconResult isKindOfClass:[NSData class]] && [iconResult length] > 0) {
-                icon = [UIImage imageWithData:iconResult];
-            } else if ([iconResult isKindOfClass:[NSDictionary class]]) {
-                id nestedData = iconResult[@"data"] ?: iconResult[@"imageData"];
-                if ([nestedData isKindOfClass:[NSData class]]) icon = [UIImage imageWithData:nestedData];
-                else if ([nestedData isKindOfClass:[UIImage class]]) icon = nestedData;
+    static NSArray<NSDictionary *> *cachedApps;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSMutableArray<NSDictionary *> *result = [NSMutableArray new];
+        Class workspaceClass = NSClassFromString(@"LSApplicationWorkspace");
+        SEL defaultWorkspaceSelector = NSSelectorFromString(@"defaultWorkspace");
+        SEL allAppsSelector = NSSelectorFromString(@"allInstalledApplications");
+        if (!workspaceClass || ![workspaceClass respondsToSelector:defaultWorkspaceSelector]) {
+            cachedApps = @[];
+            return;
+        }
+        id workspace = ((id (*)(id, SEL))objc_msgSend)(workspaceClass, defaultWorkspaceSelector);
+        if (![workspace respondsToSelector:allAppsSelector]) {
+            cachedApps = @[];
+            return;
+        }
+        id installed = ((id (*)(id, SEL))objc_msgSend)(workspace, allAppsSelector);
+        for (id proxy in installed) {
+            NSString *bundleID = nil;
+            NSString *name = nil;
+            SEL idSelector = NSSelectorFromString(@"applicationIdentifier");
+            SEL nameSelector = NSSelectorFromString(@"localizedName");
+            if ([proxy respondsToSelector:idSelector]) bundleID = ((id (*)(id, SEL))objc_msgSend)(proxy, idSelector);
+            if ([proxy respondsToSelector:nameSelector]) name = ((id (*)(id, SEL))objc_msgSend)(proxy, nameSelector);
+            if (bundleID.length) {
+                [result addObject:@{@"id: bundleID, @"name": name.length ? name : bundleID}];
             }
         }
-        // UIKit fallback: LaunchServices iconDataForVariant: may return nil on some iOS 15 builds.
-        if (!icon && bundleID.length) {
-            SEL imageSelector = NSSelectorFromString(@"_applicationIconImageForBundleIdentifier:format:scale:");
-            if ([UIImage respondsToSelector:imageSelector]) {
-                icon = ((id (*)(id, SEL, id, NSInteger, CGFloat))objc_msgSend)(
-                    [UIImage class], imageSelector, bundleID, 0, [UIScreen mainScreen].scale
-                );
-            }
-        }
-
-        if (bundleID.length) {
-            NSMutableDictionary *app = [@{@"id": bundleID, @"name": name.length ? name : bundleID} mutableCopy];
-            if (icon) app[@"icon"] = icon;
-            [result addObject:app];
-        }
-    }
-    [result sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
-        return [a[@"name"] localizedCaseInsensitiveCompare:b[@"name"]];
-    }];
-    return result;
+        [result sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+            return [a[@"name"] localizedCaseInsensitiveCompare:b[@"name"]];
+        }];
+        cachedApps = [result copy];
+    });
+    return cachedApps ?: @[];
 }
 
 @implementation FLUAppDatesController
@@ -308,7 +306,7 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
     NSDictionary *app = self.visibleApps[indexPath.row];
     cell.textLabel.text = app[@"name"];
     cell.detailTextLabel.text = app[@"id"];
-    cell.imageView.image = [app[@"icon"] isKindOfClass:[UIImage class]] ? app[@"icon"] : nil;
+    cell.imageView.image = FLUIconForBundleIdentifier(app[@"id"]);
     cell.imageView.contentMode = UIViewContentModeScaleAspectFit;
     cell.imageView.layer.cornerRadius = 8.0;
     cell.imageView.clipsToBounds = YES;
@@ -423,7 +421,7 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
     NSDictionary *app = self.visibleApps[indexPath.row];
     cell.textLabel.text = app[@"name"];
     cell.detailTextLabel.text = app[@"id"];
-    cell.imageView.image = [app[@"icon"] isKindOfClass:[UIImage class]] ? app[@"icon"] : nil;
+    cell.imageView.image = FLUIconForBundleIdentifier(app[@"id"]);
     cell.imageView.contentMode = UIViewContentModeScaleAspectFit;
     cell.imageView.layer.cornerRadius = 8.0;
     cell.imageView.clipsToBounds = YES;
