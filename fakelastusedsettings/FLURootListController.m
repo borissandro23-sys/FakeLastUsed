@@ -249,7 +249,7 @@ static NSArray<NSDictionary *> *FLUInstalledApps(void) {
             if ([proxy respondsToSelector:idSelector]) bundleID = ((id (*)(id, SEL))objc_msgSend)(proxy, idSelector);
             if ([proxy respondsToSelector:nameSelector]) name = ((id (*)(id, SEL))objc_msgSend)(proxy, nameSelector);
             if (bundleID.length) {
-                [result addObject:@{@"id: bundleID, @"name": name.length ? name : bundleID}];
+                [result addObject:@{@"id": bundleID, @"name": (name.length ? name : bundleID)}];
             }
         }
         [result sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
