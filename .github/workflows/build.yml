@@ -45,7 +45,7 @@ jobs:
           export THEOS_PACKAGE_SCHEME=rootless
           # Non-fatal if SDK 15.5 missing — fall back to available SDK
           make clean || true
-          make package FINALPACKAGE=1 || make package
+          make package FINALPACKAGE=1
 
       - name: Locate deb
         id: deb
