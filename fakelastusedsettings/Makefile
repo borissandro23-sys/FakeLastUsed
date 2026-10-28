@@ -1,3 +1,5 @@
+include $(THEOS)/makefiles/common.mk
+
 BUNDLE_NAME := FakeLastUsedSettings
 
 FakeLastUsedSettings_FILES := FLURootListController.m
@@ -7,7 +9,6 @@ FakeLastUsedSettings_INSTALL_PATH := /Library/PreferenceBundles
 FakeLastUsedSettings_CFLAGS := -fobjc-arc
 FakeLastUsedSettings_RESOURCE_DIRS := Resources
 
-include $(THEOS)/makefiles/common.mk
 include $(THEOS_MAKE_PATH)/bundle.mk
 
 internal-stage::
